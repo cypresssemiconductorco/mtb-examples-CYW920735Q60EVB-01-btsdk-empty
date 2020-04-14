@@ -55,6 +55,7 @@
 #include "wiced_bt_trace.h"
 #include "wiced_hal_puart.h"
 #include "wiced_bt_stack.h"
+#include "wiced_transport.h"
 #include "GeneratedSource/cycfg_gatt_db.h"
 
 /*******************************************************************
@@ -63,6 +64,31 @@
 static wiced_bt_dev_status_t  app_bt_management_callback    ( wiced_bt_management_evt_t event, wiced_bt_management_evt_data_t *p_event_data );
 wiced_result_t app_set_advertisement_data(void);
 wiced_bt_gatt_status_t app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t *p_data );
+
+/******************************************************************************
+ *                                Variables Definitions
+ ******************************************************************************/
+/* transport configuration, needed for WICED HCI traces */
+const wiced_transport_cfg_t transport_cfg =
+{
+    .type = WICED_TRANSPORT_UART,
+    .cfg =
+    {
+        .uart_cfg =
+        {
+            .mode = WICED_TRANSPORT_UART_HCI_MODE,
+            .baud_rate =  HCI_UART_DEFAULT_BAUD
+        },
+    },
+    .rx_buff_pool_cfg =
+    {
+        .buffer_size = 0,
+        .buffer_count = 0
+    },
+    .p_status_handler = NULL,
+    .p_data_handler = NULL,
+    .p_tx_complete_cback = NULL
+};
 
 /*******************************************************************************
 * Function Name: void application_start(void)
@@ -80,13 +106,19 @@ wiced_bt_gatt_status_t app_gatt_callback( wiced_bt_gatt_evt_t event, wiced_bt_ga
 ********************************************************************************/
 APPLICATION_START()
 {
+    wiced_transport_init( &transport_cfg );
+
 #if ((defined WICED_BT_TRACE_ENABLE) || (defined HCI_TRACE_OVER_TRANSPORT))
     /* Select Debug UART setting to see debug traces on the appropriate port */
+#ifdef NO_PUART_SUPPORT
+    wiced_set_debug_uart(  WICED_ROUTE_DEBUG_TO_WICED_UART );
+#else
     wiced_set_debug_uart(  WICED_ROUTE_DEBUG_TO_PUART );
 #ifdef CYW20706A2
     wiced_hal_puart_select_uart_pads( WICED_PUART_RXD, WICED_PUART_TXD, 0, 0);
-#endif
-#endif
+#endif // CYW20706A2
+#endif // NO_PUART_SUPPORT
+#endif // WICED_BT_TRACE_ENABLE
 
     WICED_BT_TRACE("**** App Start **** \n\r");
 
@@ -96,10 +128,10 @@ APPLICATION_START()
     wiced_bt_stack_init(app_bt_management_callback, &wiced_bt_cfg_settings, wiced_bt_cfg_buf_pools);
 }
 
-/**************************************************************************************************
+/*************************************************************************************************
 * Function Name: wiced_bt_dev_status_t app_bt_management_callback(wiced_bt_management_evt_t event,
 *                                                  wiced_bt_management_evt_data_t *p_event_data)
-***********************************************************************************************    ***
+**************************************************************************************************
 * Summary:
 *   This is a Bluetooth stack management event handler function to receive events from
 *   BLE stack and process as per the application.
